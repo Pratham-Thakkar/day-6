@@ -12,9 +12,9 @@ const userModel = new Schema({
     type: String,
     required: true,
   },
-  token: {
+  resetPasswordToken: {
     type: String,
-    default: " ",
+    default: "",
   },
 });
 

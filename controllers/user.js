@@ -1,7 +1,6 @@
 const User = require("../models/user");
-const dotenv = require("dotenv").config();
+require("dotenv").config();
 const jwt = require("jsonwebtoken");
-const bcrypt = require("bcrypt");
 
 exports.addUser = async (req, res) => {
   try {
@@ -22,18 +21,18 @@ exports.forgotPassword = async (req, res) => {
       body: { email },
     } = req;
     if (!email) throw Error("email not provided");
-    const user = await User.findOne({ email });
-    if (!user) throw Error("User does not exist");
-    const token = jwt.sign(
+
+    const resetPasswordToken = jwt.sign(
       {
         exp: Math.floor(Date.now() / 1000) + 60 * 60,
         data: { email },
       },
       process.env.SECRET_KEY
     );
-    user.token = token;
-    await user.save();
-    return res.send({ status: "sucess", token });
+
+    const user = await User.findOneAndUpdate({ email }, { resetPasswordToken });
+    if (!user) throw Error("User does not exist");
+    return res.send({ status: "sucess", resetPasswordToken });
   } catch (e) {
     return res.status(503).send({ status: "failed", message: e.message });
   }
@@ -42,11 +41,11 @@ exports.forgotPassword = async (req, res) => {
 exports.verifyToken = async (req, res, next) => {
   try {
     const {
-      body: { token, id },
+      body: { resetPasswordToken },
     } = req;
-    if (!id || !token) throw Error("unauthorized");
-    const user = await User.findOne({ _id: id });
-    let payload = jwt.verify(token, process.env.SECRET_KEY);
+    if (!resetPasswordToken) throw Error("unauthorized");
+    let payload = jwt.verify(resetPasswordToken, process.env.SECRET_KEY);
+    const user = await User.findOne({ email: payload.data.email });
     if (user.email !== payload.data.email) throw Error("Token Expired");
     res.send({ status: "success", message: "token verified" });
   } catch (e) {
@@ -57,16 +56,18 @@ exports.verifyToken = async (req, res, next) => {
 exports.updatePassword = async (req, res) => {
   try {
     const {
-      body: { newPassword, id, token },
+      body: { newPassword, resetPasswordToken },
     } = req;
-    if (!id || !token) throw Error("unauthorized");
-    const user = await User.findOne({ _id: id });
-    if (user.token !== token) throw Error("Token Invalid");
-    let payload = jwt.verify(token, process.env.SECRET_KEY);
-    if (user.email !== payload.data.email) throw Error("Token Expired");
+    if (!resetPasswordToken) throw Error("unauthorized");
+
+    let payload = jwt.verify(resetPasswordToken, process.env.SECRET_KEY);
+    const user = await User.findOne({ email: payload.data.email });
+
+    if (user.resetPasswordToken !== resetPasswordToken)
+      throw Error("Token Invalid");
     user.password = newPassword;
-    user.token = " ";
-    user.save();
+    user.resetPasswordToken = "";
+    await user.save();
     res.send({ status: "success", message: "password updated" });
   } catch (e) {
     return res.status(503).send({ status: "failed", message: e.message });
