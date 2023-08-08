@@ -31,7 +31,6 @@ exports.forgotPassword = async (req, res) => {
       },
       process.env.SECRET_KEY
     );
-    console.log(token);
     user.token = token;
     await user.save();
     return res.send({ status: "sucess", token });
@@ -60,6 +59,7 @@ exports.updatePassword = async (req, res) => {
     const {
       body: { newPassword, id, token },
     } = req;
+    if (!id || !token) throw Error("unauthorized");
     const user = await User.findOne({ _id: id });
     if (user.token !== token) throw Error("Token Invalid");
     let payload = jwt.verify(token, process.env.SECRET_KEY);
